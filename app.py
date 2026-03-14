@@ -10,7 +10,7 @@ budget = st.number_input("Enter your budget ($)", min_value=0.0, step=1.0)
 
 items_text = st.text_area(
     "Enter grocery items separated by commas",
-    placeholder="eggs, milk, bread"
+    placeholder="eggs, chicken breast, white rice, olive oil"
 )
 
 if st.button("Find Cheapest Basket"):

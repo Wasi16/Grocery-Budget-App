@@ -48,7 +48,25 @@ def scrape_products(search_term):
 def save_products():
     all_products = []
 
-    for item in ["eggs", "milk", "bread"]:
+    for item in [
+    "eggs",
+    "full cream milk",
+    "white bread",
+    "chicken breast",
+    "tuna can",
+    "greek yogurt",
+    "cheddar cheese",
+    "white rice",
+    "pasta",
+    "rolled oats",
+    "wraps",
+    "olive oil",
+    "butter",
+    "bananas",
+    "apples",
+    "potatoes",
+    "brown onions"
+]:
         print(f"Searching: {item}")
         results = scrape_products(item)
         print(f"Found {len(results)} products for {item}")
