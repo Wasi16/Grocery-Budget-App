@@ -50,7 +50,6 @@ def find_store_basket(user_items, products_csv, store_name, nutrition_csv="data/
         if matches.empty:
             continue
 
-        # Use cup_price when available for fairer comparison, otherwise fall back to price
         matches["comparison_price"] = matches["cup_price"].fillna(matches["price"])
 
         matches = matches.sort_values(
