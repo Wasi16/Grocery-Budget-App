@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
 from logic.compare_baskets import compare_baskets
+from logic.recipe_chat import build_recipe_response
 
 app = FastAPI()
 
@@ -18,6 +19,10 @@ app.add_middleware(
 class BasketRequest(BaseModel):
     items: List[str]
     budget: float
+
+
+class RecipeChatRequest(BaseModel):
+    message: str
 
 
 @app.get("/")
@@ -58,4 +63,16 @@ def basket(request: BasketRequest):
         "savings": comparison["savings"],
         "nutrition": comparison["nutrition"],
         "budget": request.budget,
+    }
+
+
+@app.post("/recipe-chat")
+def recipe_chat(request: RecipeChatRequest):
+    response = build_recipe_response(request.message)
+
+    return {
+        "title": response["title"],
+        "reply": response["reply"],
+        "ingredients": response["ingredients"],
+        "steps": response["steps"]
     }

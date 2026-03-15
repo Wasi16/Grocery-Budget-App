@@ -44,22 +44,25 @@ ITEM_TYPES = {
 }
 
 PRODUCE_POSITIVE_WORDS = {
-    "fresh", "loose", "bunch", "kg", "per kg"
+    "fresh", "loose", "bunch", "kg", "per kg", "each", "punnet", "bag"
 }
 
 PRODUCE_NEGATIVE_WORDS = {
     "yoghurt", "yogurt", "chips", "bread", "muffin", "muffins",
     "custard", "puree", "pouch", "snack", "drink", "juice",
-    "smoothie", "bar", "bars", "cereal", "baby"
+    "smoothie", "bar", "bars", "cereal", "baby", "prawn", "prawns",
+    "sunscreen", "perfume", "chalk", "chalksters", "banana republic"
 }
 
 PROTEIN_POSITIVE_WORDS = {
-    "breast", "fillet", "fillets", "dozen", "free range", "cage", "can", "canned"
+    "breast", "fillet", "fillets", "dozen", "free range", "cage", "can", "canned", "tuna", "egg", "eggs", "chicken"
 }
 
 PROTEIN_NEGATIVE_WORDS = {
     "snack", "meal", "soup", "salad", "flavoured", "flavored", "dip",
-    "yoghurt", "yogurt", "custard", "dessert", "chips"
+    "yoghurt", "yogurt", "custard", "dessert", "chips",
+    "cat", "dog", "pet", "kitten", "puppy", "bowl", "tray", "litter",
+    "wet cat food", "wet dog food", "treat", "toy"
 }
 
 DAIRY_NEGATIVE_WORDS = {
@@ -67,7 +70,13 @@ DAIRY_NEGATIVE_WORDS = {
 }
 
 STAPLE_NEGATIVE_WORDS = {
-    "snack", "chips", "bar", "bars", "sweet"
+    "snack", "chips", "bar", "bars", "sweet",
+    "bowl", "cooker", "steamer", "container", "lamp", "scoop",
+    "ricer", "rice paper", "magic", "desk", "kitchen tool", "potato ricer"
+}
+
+PANTRY_NEGATIVE_WORDS = {
+    "spray bottle", "cleaner", "soap"
 }
 
 
@@ -89,14 +98,12 @@ def relevance_score(search_term: str, product_name: str) -> int:
     name = str(product_name).lower().strip()
 
     score = 0
-
-    # Base score from matching words in the search term
     tokens = search_term.split()
+
     for token in tokens:
         if token in name:
             score += 3
 
-    # Strong bonus for exact phrase match
     if search_term in name:
         score += 5
 
@@ -108,7 +115,7 @@ def relevance_score(search_term: str, product_name: str) -> int:
                 score += 2
         for word in PRODUCE_NEGATIVE_WORDS:
             if word in name:
-                score -= 5
+                score -= 7
 
     elif item_type == "protein":
         for word in PROTEIN_POSITIVE_WORDS:
@@ -116,21 +123,41 @@ def relevance_score(search_term: str, product_name: str) -> int:
                 score += 2
         for word in PROTEIN_NEGATIVE_WORDS:
             if word in name:
-                score -= 4
+                score -= 8
 
     elif item_type == "dairy":
         for word in DAIRY_NEGATIVE_WORDS:
             if word in name:
-                score -= 4
+                score -= 6
 
     elif item_type == "staple":
         for word in STAPLE_NEGATIVE_WORDS:
             if word in name:
-                score -= 4
+                score -= 8
 
-    # Extra rule: if no search token appears at all, heavily penalize
+    elif item_type == "pantry":
+        for word in PANTRY_NEGATIVE_WORDS:
+            if word in name:
+                score -= 6
+
+    if search_term == "tuna can":
+        if "tuna" not in name:
+            score -= 12
+        if "cat" in name or "dog" in name or "pet" in name:
+            score -= 20
+
+    if search_term == "white rice":
+        if "rice" not in name:
+            score -= 12
+        if any(bad in name for bad in ["bowl", "cooker", "steamer", "container", "lamp", "ricer"]):
+            score -= 20
+
+    if search_term == "bananas":
+        if any(bad in name for bad in ["prawn", "perfume", "sunscreen"]):
+            score -= 20
+
     if not any(token in name for token in tokens):
-        score -= 10
+        score -= 15
 
     return score
 
@@ -143,31 +170,32 @@ def find_cheapest_products(
     df = load_products(products_csv)
     nutrition_df = load_nutrition(nutrition_csv)
 
+    df["search_term"] = df["search_term"].astype(str).str.strip().str.lower()
+    df["name"] = df["name"].astype(str)
     df["price"] = pd.to_numeric(df["price"], errors="coerce")
-    df["cup_price"] = pd.to_numeric(df["cup_price"], errors="coerce")
+    df["cup_price"] = pd.to_numeric(df.get("cup_price", None), errors="coerce")
 
     selected_products = []
 
     for item in user_items:
         item = normalize_item(item)
 
-        matches = df[df["search_term"].str.lower() == item].copy()
+        matches = df[df["search_term"] == item].copy()
 
         if matches.empty:
             continue
 
         matches["relevance"] = matches["name"].apply(lambda x: relevance_score(item, x))
-
-        # Keep only reasonably relevant products
         matches = matches[matches["relevance"] > 0]
 
         if matches.empty:
             continue
 
-        # Highest relevance first, then cheapest price
+        matches["comparison_price"] = matches["cup_price"].fillna(matches["price"])
+
         matches = matches.sort_values(
-            by=["relevance", "price"],
-            ascending=[False, True]
+            by=["relevance", "comparison_price", "price"],
+            ascending=[False, True, True]
         )
 
         best_match = matches.iloc[0]
